@@ -39,6 +39,17 @@ public struct BingoSessionView: View {
     /// Wall-clock time of the next auto-draw. Updated by the auto-advance
     /// task; consumed by the countdown card in ControlBar.
     @State private var nextDrawAt: Date? = nil
+    /// User-initiated pause via the countdown card. Persists across
+    /// foreground/background transitions.
+    @State private var isUserPaused = false
+    /// Implicit pause when the app is in the background. Cleared on
+    /// returning to foreground.
+    @State private var isBackgroundPaused = false
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Effective pause = either the user paused, or the app is backgrounded.
+    private var isEffectivelyPaused: Bool { isUserPaused || isBackgroundPaused }
 
     /// The theme to use everywhere in this view — the user's setting if
     /// they've picked one, otherwise the value inherited from the host.
@@ -54,11 +65,13 @@ public struct BingoSessionView: View {
         session.marks.reduce(0) { $0 + $1.count }
     }
 
-    /// Combined id for the auto-advance task. Changing the interval OR
-    /// restarting the session (which updates `startedAt`) restarts the loop.
+    /// Combined id for the auto-advance task. Changing the interval, the
+    /// session (via startedAt), or the effective-pause state all restart
+    /// the loop.
     private struct AutoAdvanceID: Hashable {
         let interval: Int
         let sessionStart: Date
+        let paused: Bool
     }
 
     public init(
@@ -102,7 +115,9 @@ public struct BingoSessionView: View {
                 ControlBar(
                     session: session,
                     ballInterval: ballInterval,
-                    nextDrawAt: nextDrawAt
+                    nextDrawAt: nextDrawAt,
+                    isPaused: isEffectivelyPaused,
+                    onTogglePause: { isUserPaused.toggle() }
                 )
                 .padding(.horizontal)
                 .safeAreaPadding(.bottom, 8)
@@ -145,10 +160,24 @@ public struct BingoSessionView: View {
                 recordCurrentGameIfNeeded()
             }
         }
-        // Reset the per-round record flag when startedAt changes (a fresh
-        // session — restart or new cards).
+        // Reset the per-round record flag AND user-initiated pause when
+        // startedAt changes (a fresh session — restart or new cards).
         .onChange(of: session.startedAt) { _, _ in
             didRecordCurrentGame = false
+            isUserPaused = false
+        }
+        // Auto-pause on background + cancel any in-progress voice. Foreground
+        // clears the auto-pause; user-pause persists across transitions.
+        .onChange(of: scenePhase) { _, new in
+            switch new {
+            case .background, .inactive:
+                isBackgroundPaused = true
+                caller.cancel()
+            case .active:
+                isBackgroundPaused = false
+            @unknown default:
+                break
+            }
         }
         .onChange(of: autoDaub) { _, new in
             guard new else { return }
@@ -156,11 +185,19 @@ public struct BingoSessionView: View {
                 session.autoMarkCalledNumbers()
             }
         }
-        // Auto-advance: when ballInterval is non-manual, draw a ball every N
-        // seconds. Re-keyed on session.startedAt so restarting the game also
-        // restarts the loop. Publishes `nextDrawAt` so the countdown card
-        // in ControlBar can tick down to it.
-        .task(id: AutoAdvanceID(interval: ballIntervalRaw, sessionStart: session.startedAt)) {
+        // Auto-advance: when ballInterval is non-manual AND the game isn't
+        // paused, draw a ball every N seconds. Re-keyed on startedAt and
+        // the effective pause flag so restarting OR pausing restarts the
+        // loop (which then either resumes or exits cleanly).
+        .task(id: AutoAdvanceID(
+            interval: ballIntervalRaw,
+            sessionStart: session.startedAt,
+            paused: isEffectivelyPaused
+        )) {
+            guard !isEffectivelyPaused else {
+                nextDrawAt = nil
+                return
+            }
             guard let seconds = ballInterval.seconds else {
                 nextDrawAt = nil
                 return
