@@ -10,10 +10,19 @@ import mvBingoKit
 public struct BingoSessionView: View {
 
     @State private var session: BingoSession
+    @State private var isShowingSettings = false
     @Environment(\.bingoTheme) private var theme
 
+    @AppStorage(BingoSettingsKey.cardCount)
+    private var cardCount: Int = BingoSettingsDefault.cardCount
+
     public init(session: BingoSession? = nil) {
-        let initial = session ?? BingoSession.random()
+        // Read the persisted card count so the session boots with the
+        // player's last setting; defaults to 1 on first launch.
+        let stored = UserDefaults.standard.object(forKey: BingoSettingsKey.cardCount) as? Int
+        let count = stored ?? BingoSettingsDefault.cardCount
+        let clamped = max(1, min(BingoSession.maxCards, count))
+        let initial = session ?? BingoSession.random(cardCount: clamped)
         _session = State(initialValue: initial)
     }
 
@@ -26,23 +35,7 @@ public struct BingoSessionView: View {
 
                 HStack(alignment: .center, spacing: 16) {
                     LastBallView(ball: session.lastDrawn)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(session.pattern.label)
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(theme.headlineColor)
-                        Text("\(session.drawn.count) of 75 called")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.bodyColor.opacity(0.9))
-                            .monospacedDigit()
-                        if let win = session.firstWin {
-                            Text(session.cardCount > 1
-                                 ? "BINGO — Card \(win.cardIndex + 1)!"
-                                 : "BINGO — \(win.pattern.label)!")
-                                .font(.callout.weight(.bold))
-                                .foregroundStyle(theme.lastBallRing)
-                                .padding(.top, 2)
-                        }
-                    }
+                    statusBlock
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal)
@@ -63,16 +56,63 @@ public struct BingoSessionView: View {
             }
             .padding(.top, 8)
         }
+        .onChange(of: cardCount) { _, new in
+            let clamped = max(1, min(BingoSession.maxCards, new))
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                session.setCardCount(clamped)
+            }
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsSheet()
+                .bingoTheme(theme)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 10) {
             Text("Bingo")
                 .font(.system(.largeTitle, design: .serif).weight(.bold))
                 .foregroundStyle(theme.headlineColor)
             Spacer()
+            Button {
+                isShowingSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(theme.headlineColor)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                Circle().stroke(theme.bodyColor.opacity(0.22), lineWidth: 1)
+                            )
+                    )
+            }
+            .accessibilityLabel("Settings")
         }
         .padding(.horizontal)
+    }
+
+    private var statusBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.pattern.label)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(theme.headlineColor)
+            Text("\(session.drawn.count) of 75 called")
+                .font(.subheadline)
+                .foregroundStyle(theme.bodyColor.opacity(0.9))
+                .monospacedDigit()
+            if let win = session.firstWin {
+                Text(session.cardCount > 1
+                     ? "BINGO — Card \(win.cardIndex + 1)!"
+                     : "BINGO — \(win.pattern.label)!")
+                    .font(.callout.weight(.bold))
+                    .foregroundStyle(theme.lastBallRing)
+                    .padding(.top, 2)
+            }
+        }
     }
 
     /// Lays out 1...4 cards adaptively. Single card is full-width; 2 and 3
