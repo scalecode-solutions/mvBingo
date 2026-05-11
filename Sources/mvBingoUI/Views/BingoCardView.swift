@@ -15,22 +15,27 @@ public struct BingoCardView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 4) {
-            headerRow
-            ForEach(0..<5, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(0..<5, id: \.self) { col in
-                        cell(at: GridPoint(column: col, row: row))
+        // Defensive: if SwiftUI re-evaluates this view with a stale
+        // cardIndex (e.g., briefly during a setCardCount transition),
+        // bail out instead of crashing on cards[cardIndex].
+        if session.cards.indices.contains(cardIndex) {
+            VStack(spacing: 4) {
+                headerRow
+                ForEach(0..<5, id: \.self) { row in
+                    HStack(spacing: 4) {
+                        ForEach(0..<5, id: \.self) { col in
+                            cell(at: GridPoint(column: col, row: row))
+                        }
                     }
                 }
             }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(theme.cardBackground)
+                    .shadow(color: .black.opacity(0.4), radius: 14, x: 0, y: 8)
+            )
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(theme.cardBackground)
-                .shadow(color: .black.opacity(0.4), radius: 14, x: 0, y: 8)
-        )
     }
 
     private var card: BingoCard { session.cards[cardIndex] }

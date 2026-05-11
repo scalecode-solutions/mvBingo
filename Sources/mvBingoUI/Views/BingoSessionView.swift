@@ -375,11 +375,28 @@ public struct BingoSessionView: View {
 
     /// Lays out 1...4 cards adaptively. Single card is full-width; 2 and 3
     /// stack vertically; 4 fits in a 2×2 grid.
+    ///
+    /// Each case enumerates indices explicitly rather than using
+    /// `ForEach(0..<session.cardCount)` — dynamic ranges in `ForEach`
+    /// have a known SwiftUI footgun where stale views can briefly survive
+    /// a range shrink, then crash on out-of-range subscripts. Explicit
+    /// cases dodge the issue entirely.
     @ViewBuilder
     private var cardsLayout: some View {
         switch session.cardCount {
         case 1:
             BingoCardView(session: session, cardIndex: 0)
+        case 2:
+            VStack(spacing: 8) {
+                BingoCardView(session: session, cardIndex: 0)
+                BingoCardView(session: session, cardIndex: 1)
+            }
+        case 3:
+            VStack(spacing: 8) {
+                BingoCardView(session: session, cardIndex: 0)
+                BingoCardView(session: session, cardIndex: 1)
+                BingoCardView(session: session, cardIndex: 2)
+            }
         case 4:
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -392,11 +409,7 @@ public struct BingoSessionView: View {
                 }
             }
         default:
-            VStack(spacing: 8) {
-                ForEach(0..<session.cardCount, id: \.self) { i in
-                    BingoCardView(session: session, cardIndex: i)
-                }
-            }
+            BingoCardView(session: session, cardIndex: 0)
         }
     }
 }
