@@ -9,16 +9,22 @@ public struct ControlBar: View {
     @Bindable public var session: BingoSession
     public let ballInterval: BallInterval
     public let nextDrawAt: Date?
+    public let isPaused: Bool
+    public let onTogglePause: () -> Void
     @Environment(\.bingoTheme) private var theme
 
     public init(
         session: BingoSession,
         ballInterval: BallInterval = .manual,
-        nextDrawAt: Date? = nil
+        nextDrawAt: Date? = nil,
+        isPaused: Bool = false,
+        onTogglePause: @escaping () -> Void = {}
     ) {
         self.session = session
         self.ballInterval = ballInterval
         self.nextDrawAt = nextDrawAt
+        self.isPaused = isPaused
+        self.onTogglePause = onTogglePause
     }
 
     public var body: some View {
@@ -64,7 +70,9 @@ public struct ControlBar: View {
             CountdownCard(
                 nextDrawAt: nextDrawAt,
                 intervalSeconds: ballInterval.seconds ?? 0,
-                isPaused: session.hasBingo || session.isExhausted
+                isPaused: isPaused,
+                isGameOver: session.hasBingo || session.isExhausted,
+                onTogglePause: onTogglePause
             )
         }
     }
@@ -129,72 +137,96 @@ public struct ControlBar: View {
     }
 }
 
-/// Live countdown to the next auto-drawn ball.
+/// Live countdown to the next auto-drawn ball. Tap the card to pause /
+/// resume the timer.
 ///
 /// Drives a `TimelineView` so the seconds display and the circular progress
-/// arc stay in sync with `Date.now`. When the game ends or the timer's
-/// task hasn't published a target yet (`nextDrawAt == nil`), shows a
-/// frozen "—" placeholder.
+/// arc stay in sync with `Date.now`. When paused or the game is over,
+/// shows a frozen "—" with a state-appropriate caption.
 private struct CountdownCard: View {
 
     let nextDrawAt: Date?
     let intervalSeconds: TimeInterval
     let isPaused: Bool
+    let isGameOver: Bool
+    let onTogglePause: () -> Void
     @Environment(\.bingoTheme) private var theme
 
+    private var isFrozen: Bool { isPaused || isGameOver }
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isPaused)) { ctx in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isFrozen)) { ctx in
             let remaining: TimeInterval = {
-                guard let target = nextDrawAt else { return 0 }
+                guard let target = nextDrawAt, !isFrozen else { return 0 }
                 return max(0, target.timeIntervalSince(ctx.date))
             }()
             let progress: Double = intervalSeconds > 0
                 ? max(0, min(1, remaining / intervalSeconds))
                 : 0
-            let displayValue: String = (nextDrawAt == nil || isPaused)
-                ? "—"
-                : "\(Int(ceil(remaining)))"
+            let centerLabel: String = isFrozen
+                ? ""
+                : (nextDrawAt == nil ? "—" : "\(Int(ceil(remaining)))")
 
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .stroke(theme.lastBallText.opacity(0.28), lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(theme.lastBallText, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text(displayValue)
-                        .font(.system(.title3, design: .rounded).weight(.heavy))
-                        .foregroundStyle(theme.lastBallText)
-                        .monospacedDigit()
+            Button(action: onTogglePause) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .stroke(theme.lastBallText.opacity(0.28), lineWidth: 3)
+                        if !isFrozen {
+                            Circle()
+                                .trim(from: 0, to: progress)
+                                .stroke(theme.lastBallText, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        if isFrozen {
+                            Image(systemName: isPaused ? "play.fill" : "checkmark")
+                                .font(.callout.weight(.heavy))
+                                .foregroundStyle(theme.lastBallText)
+                        } else {
+                            Text(centerLabel)
+                                .font(.system(.title3, design: .rounded).weight(.heavy))
+                                .foregroundStyle(theme.lastBallText)
+                                .monospacedDigit()
+                        }
+                    }
+                    .frame(width: 38, height: 38)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(headlineLabel)
+                            .font(.callout.weight(.bold))
+                            .textCase(.uppercase)
+                            .tracking(0.6)
+                            .foregroundStyle(theme.lastBallText)
+                        Text(subtitle(remaining: remaining))
+                            .font(.caption2)
+                            .foregroundStyle(theme.lastBallText.opacity(0.78))
+                    }
+
+                    Spacer(minLength: 0)
                 }
-                .frame(width: 38, height: 38)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Next Ball")
-                        .font(.callout.weight(.bold))
-                        .textCase(.uppercase)
-                        .tracking(0.6)
-                        .foregroundStyle(theme.lastBallText)
-                    Text(subtitle(remaining: remaining))
-                        .font(.caption2)
-                        .foregroundStyle(theme.lastBallText.opacity(0.78))
-                }
-
-                Spacer(minLength: 0)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(theme.lastBallRing.opacity(isFrozen ? 0.55 : 1.0))
+                )
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(theme.lastBallRing)
-            )
+            .buttonStyle(.plain)
+            .disabled(isGameOver)
+            .accessibilityLabel(isPaused ? "Resume auto-advance" : "Pause auto-advance")
         }
     }
 
-    private func subtitle(remaining: TimeInterval) -> String {
+    private var headlineLabel: String {
+        if isGameOver { return "Game Over" }
         if isPaused { return "Paused" }
+        return "Next Ball"
+    }
+
+    private func subtitle(remaining: TimeInterval) -> String {
+        if isGameOver { return "—" }
+        if isPaused { return "Tap to resume" }
         guard nextDrawAt != nil else { return "Starting…" }
         let secs = Int(ceil(remaining))
         return secs == 1 ? "in 1 second" : "in \(secs) seconds"
