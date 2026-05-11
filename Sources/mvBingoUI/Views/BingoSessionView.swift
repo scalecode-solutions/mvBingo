@@ -16,6 +16,9 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.cardCount)
     private var cardCount: Int = BingoSettingsDefault.cardCount
 
+    @AppStorage(BingoSettingsKey.autoDaub)
+    private var autoDaub: Bool = BingoSettingsDefault.autoDaub
+
     public init(session: BingoSession? = nil) {
         // Read the persisted card count so the session boots with the
         // player's last setting; defaults to 1 on first launch.
@@ -60,6 +63,20 @@ public struct BingoSessionView: View {
             let clamped = max(1, min(BingoSession.maxCards, new))
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                 session.setCardCount(clamped)
+            }
+        }
+        // Auto-daub: sweep matches after every draw, and once when the
+        // toggle flips on mid-game so any already-called numbers catch up.
+        .onChange(of: session.drawn.count) { _, _ in
+            guard autoDaub else { return }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                session.autoMarkCalledNumbers()
+            }
+        }
+        .onChange(of: autoDaub) { _, new in
+            guard new else { return }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.75)) {
+                session.autoMarkCalledNumbers()
             }
         }
         .sheet(isPresented: $isShowingSettings) {
