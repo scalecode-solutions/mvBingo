@@ -36,6 +36,9 @@ public struct BingoSessionView: View {
 
     @State private var soundPlayer = SoundEffectPlayer()
     @State private var caller = BingoCaller()
+    /// Wall-clock time of the next auto-draw. Updated by the auto-advance
+    /// task; consumed by the countdown card in ControlBar.
+    @State private var nextDrawAt: Date? = nil
 
     /// The theme to use everywhere in this view — the user's setting if
     /// they've picked one, otherwise the value inherited from the host.
@@ -96,9 +99,13 @@ public struct BingoSessionView: View {
 
                 Spacer(minLength: 0)
 
-                ControlBar(session: session)
-                    .padding(.horizontal)
-                    .safeAreaPadding(.bottom, 8)
+                ControlBar(
+                    session: session,
+                    ballInterval: ballInterval,
+                    nextDrawAt: nextDrawAt
+                )
+                .padding(.horizontal)
+                .safeAreaPadding(.bottom, 8)
             }
             .padding(.top, 8)
         }
@@ -151,23 +158,36 @@ public struct BingoSessionView: View {
         }
         // Auto-advance: when ballInterval is non-manual, draw a ball every N
         // seconds. Re-keyed on session.startedAt so restarting the game also
-        // restarts the loop.
+        // restarts the loop. Publishes `nextDrawAt` so the countdown card
+        // in ControlBar can tick down to it.
         .task(id: AutoAdvanceID(interval: ballIntervalRaw, sessionStart: session.startedAt)) {
-            guard let seconds = ballInterval.seconds else { return }
+            guard let seconds = ballInterval.seconds else {
+                nextDrawAt = nil
+                return
+            }
             while !Task.isCancelled,
                   !session.hasBingo,
                   !session.isExhausted {
+                nextDrawAt = Date().addingTimeInterval(seconds)
                 do {
                     try await Task.sleep(for: .seconds(seconds))
                 } catch {
+                    nextDrawAt = nil
                     return
                 }
-                if Task.isCancelled { return }
-                guard !session.hasBingo, !session.isExhausted else { return }
+                if Task.isCancelled {
+                    nextDrawAt = nil
+                    return
+                }
+                guard !session.hasBingo, !session.isExhausted else {
+                    nextDrawAt = nil
+                    return
+                }
                 withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
                     _ = session.drawNext()
                 }
             }
+            nextDrawAt = nil
         }
         .sheet(isPresented: $isShowingSettings) {
             SettingsSheet()
