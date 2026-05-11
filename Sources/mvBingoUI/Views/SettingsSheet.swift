@@ -30,6 +30,9 @@ public struct SettingsSheet: View {
     @AppStorage(BingoSettingsKey.voiceEnabled)
     private var voiceEnabled: Bool = BingoSettingsDefault.voiceEnabled
 
+    @AppStorage(BingoSettingsKey.patternRawValue)
+    private var patternRaw: String = BingoSettingsDefault.patternRawValue
+
     public init() {}
 
     private var ballInterval: Binding<BallInterval> {
@@ -42,6 +45,7 @@ public struct SettingsSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
+                patternSection
                 cardsSection
                 daubingSection
                 timerSection
@@ -63,6 +67,22 @@ public struct SettingsSheet: View {
                 }
             }
             #endif
+        }
+    }
+
+    private var patternSection: some View {
+        let selectedPattern = WinPattern(rawValue: patternRaw) ?? .anyLine
+        return Section {
+            Picker("Win Pattern", selection: $patternRaw) {
+                ForEach(WinPattern.allCases, id: \.rawValue) { pattern in
+                    Text(pattern.label).tag(pattern.rawValue)
+                }
+            }
+        } header: {
+            sectionHeader("Pattern")
+        } footer: {
+            Text(selectedPattern.blurb)
+                .foregroundStyle(theme.bodyColor.opacity(0.8))
         }
     }
 
