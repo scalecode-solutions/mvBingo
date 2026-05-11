@@ -19,7 +19,7 @@ for iPhone.)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.1.0"),
+    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.2.0"),
 ],
 targets: [
     .target(
@@ -54,17 +54,20 @@ player dab matches, and detects the winning pattern.
 
 - **75-ball standard format** — B 1-15, I 16-30, N 31-45, G 46-60, O 61-75
 - **5 winning patterns** — Any Line, Four Corners, X, Plus, Blackout
-- **Free center space** — pre-marked and can't be toggled off, as tradition
-  demands
-- **Dauber-style marks** — tap any cell whose number has been called to dab
-  it; tap again to remove
-- **Last-called readout** — big circular badge with the current letter +
-  number
-- **Call history grid** — see all 75 numbers at a glance, drawn ones
-  highlighted in dauber ink
-- **Themeable** — `Theme` value type read from the environment, ships with
-  `.churchBasement` (ivory card, hot-pink dauber, navy header) and is open
-  to custom palettes
+- **1 to 4 cards on screen** — solo or simulate a multi-card bingo hall
+- **Free center space** — pre-marked and can't be toggled off
+- **Manual or auto-daub** — tap to mark, or let the app catch matches
+- **Manual or auto-advance** — tap Next Ball, or pick a 5/10/15/20 second
+  draw timer
+- **Voice caller (optional)** — `AVSpeechSynthesizer` announces each ball:
+  "B... twelve"
+- **Procedural sound effects (optional)** — ball-pop, daub-tap, BINGO
+  fanfare, no audio assets shipped
+- **Four themes** — Church Basement, Vegas Night, Cracker Barrel, Kid
+  Friendly. Settings picker, persists across launches
+- **Pluggable persistence** — `StatsStore` protocol with `UserDefaults`
+  (zero-dep) and `SwiftData` (queryable) backends shipped
+- **Settings sheet + stats sheet** — gear and chart icons in the header
 - **Engine-only embeddable** — `import mvBingoKit` if you want to drive
   bingo with your own UI
 
@@ -72,13 +75,18 @@ player dab matches, and detects the winning pattern.
 
 ```
 mvBingoKit  (pure Swift, zero UI deps)
-├── Model       BingoBall · BingoCard · GridPoint · WinPattern
-└── Game        BingoSession (@Observable) · BingoStatus
+├── Model        BingoBall · BingoCard · GridPoint · WinPattern
+├── Game         BingoSession (@Observable, 1-4 cards) · BingoStatus
+└── Persistence  StatsStore protocol
+                 ├── UserDefaultsStatsStore
+                 └── SwiftDataStatsStore (@ModelActor + @Model)
 
 mvBingoUI   (SwiftUI 6)
-├── Theme       Theme value type + .churchBasement
-└── Views       BingoSessionView (top-level) + BingoCardView · LastBallView
-                · CallHistoryView · ControlBar
+├── Theme        Theme value type + 4 named themes + BingoThemeName
+├── Settings     @AppStorage keys + defaults + BallInterval
+├── Audio        SoundEffectPlayer · BingoCaller (AVSpeechSynthesizer)
+└── Views        BingoSessionView (top-level) + BingoCardView · LastBallView
+                 · CallHistoryView · ControlBar · SettingsSheet · StatsSheet
 ```
 
 ## Theming
