@@ -3,6 +3,10 @@ import mvBingoKit
 
 /// Renders one bingo card: B-I-N-G-O header row + 5×5 grid of cells. Tap
 /// a cell to toggle its dauber mark.
+///
+/// Uses a SwiftUI `Grid` so the header letters and number cells share
+/// column widths — the column for "B" is exactly as wide as the column
+/// of B-letter numbers below it.
 public struct BingoCardView: View {
 
     @Bindable public var session: BingoSession
@@ -19,10 +23,14 @@ public struct BingoCardView: View {
         // cardIndex (e.g., briefly during a setCardCount transition),
         // bail out instead of crashing on cards[cardIndex].
         if session.cards.indices.contains(cardIndex) {
-            VStack(spacing: 4) {
-                headerRow
+            Grid(horizontalSpacing: 4, verticalSpacing: 4) {
+                GridRow {
+                    ForEach(0..<5, id: \.self) { col in
+                        headerLetter(["B", "I", "N", "G", "O"][col])
+                    }
+                }
                 ForEach(0..<5, id: \.self) { row in
-                    HStack(spacing: 4) {
+                    GridRow {
                         ForEach(0..<5, id: \.self) { col in
                             cell(at: GridPoint(column: col, row: row))
                         }
@@ -40,19 +48,15 @@ public struct BingoCardView: View {
 
     private var card: BingoCard { session.cards[cardIndex] }
 
-    private var headerRow: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<5, id: \.self) { col in
-                Text(["B", "I", "N", "G", "O"][col])
-                    .font(.system(.title3, design: .rounded).weight(.black))
-                    .foregroundStyle(theme.headerText)
-                    .frame(maxWidth: .infinity, minHeight: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(theme.headerBackground)
-                    )
-            }
-        }
+    private func headerLetter(_ letter: String) -> some View {
+        Text(letter)
+            .font(.system(.title3, design: .rounded).weight(.black))
+            .foregroundStyle(theme.headerText)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(theme.headerBackground)
+            )
     }
 
     @ViewBuilder
@@ -94,7 +98,7 @@ public struct BingoCardView: View {
                     .stroke(theme.lastBallRing, lineWidth: 3)
             }
         }
-        .aspectRatio(1, contentMode: .fit)
+        .frame(maxWidth: .infinity, minHeight: 32)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
