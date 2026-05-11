@@ -3,13 +3,15 @@ import mvBingoKit
 import mvBingoUI
 
 struct ContentView: View {
+    let statsStore: any StatsStore
+
     var body: some View {
-        BingoSessionView()
+        BingoSessionView(statsStore: statsStore)
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(statsStore: UserDefaultsStatsStore())
         .bingoTheme(.churchBasement)
         .preferredColorScheme(.dark)
 }
