@@ -31,7 +31,11 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.themeName)
     private var themeNameRaw: String = BingoSettingsDefault.themeName
 
+    @AppStorage(BingoSettingsKey.voiceEnabled)
+    private var voiceEnabled: Bool = BingoSettingsDefault.voiceEnabled
+
     @State private var soundPlayer = SoundEffectPlayer()
+    @State private var caller = BingoCaller()
 
     /// The theme to use everywhere in this view — the user's setting if
     /// they've picked one, otherwise the value inherited from the host.
@@ -104,9 +108,14 @@ public struct BingoSessionView: View {
                 session.setCardCount(clamped)
             }
         }
-        // Auto-daub + ball-drawn sound: both fire on each new draw.
+        // Each new draw: voice announces, sound bonks, auto-daub catches up.
+        // Voice and sound are independent toggles — both can be on (layered)
+        // or off (silent draw).
         .onChange(of: session.drawn.count) { old, new in
             guard new > old else { return }
+            if voiceEnabled, let ball = session.lastDrawn {
+                caller.call(ball)
+            }
             if !soundMuted { soundPlayer.play(.ballDrawn) }
             guard autoDaub else { return }
             withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
