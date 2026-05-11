@@ -1,16 +1,17 @@
 import SwiftUI
 import mvBingoKit
 
-/// Renders a bingo card: B-I-N-G-O header row + 5×5 grid of cells. Tap a
-/// cell to toggle its dauber mark (no-op for cells whose number hasn't
-/// been called).
+/// Renders one bingo card: B-I-N-G-O header row + 5×5 grid of cells. Tap
+/// a cell to toggle its dauber mark.
 public struct BingoCardView: View {
 
     @Bindable public var session: BingoSession
+    public let cardIndex: Int
     @Environment(\.bingoTheme) private var theme
 
-    public init(session: BingoSession) {
+    public init(session: BingoSession, cardIndex: Int = 0) {
         self.session = session
+        self.cardIndex = cardIndex
     }
 
     public var body: some View {
@@ -32,13 +33,15 @@ public struct BingoCardView: View {
         )
     }
 
+    private var card: BingoCard { session.cards[cardIndex] }
+
     private var headerRow: some View {
         HStack(spacing: 4) {
             ForEach(0..<5, id: \.self) { col in
                 Text(["B", "I", "N", "G", "O"][col])
-                    .font(.system(.title, design: .rounded).weight(.black))
+                    .font(.system(.title3, design: .rounded).weight(.black))
                     .foregroundStyle(theme.headerText)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 32)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(theme.headerBackground)
@@ -50,14 +53,9 @@ public struct BingoCardView: View {
     @ViewBuilder
     private func cell(at point: GridPoint) -> some View {
         let isFree = point == BingoCard.freeSpace
-        let isMarked = session.marks.contains(point)
-        let isCallable = session.isCallable(point)
-        let isWinningCell: Bool = {
-            if case .bingo(_, let winningCells) = session.status {
-                return winningCells.contains(point)
-            }
-            return false
-        }()
+        let isMarked = session.marks(card: cardIndex).contains(point)
+        let isCallable = session.isCallable(card: cardIndex, point)
+        let isWinningCell = session.isWinningCell(card: cardIndex, point)
 
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -69,17 +67,17 @@ public struct BingoCardView: View {
 
             if isFree {
                 Text("FREE")
-                    .font(.system(.caption, design: .rounded).weight(.heavy))
+                    .font(.system(.caption2, design: .rounded).weight(.heavy))
                     .foregroundStyle(theme.cellText.opacity(0.5))
-            } else if let n = session.card.number(at: point) {
+            } else if let n = card.number(at: point) {
                 Text("\(n)")
-                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(theme.cellText)
                     .monospacedDigit()
+                    .minimumScaleFactor(0.5)
             }
 
             if isMarked {
-                // Dauber ink blot — sized just under the cell.
                 Circle()
                     .fill(theme.dauberInk)
                     .padding(4)
@@ -95,7 +93,7 @@ public struct BingoCardView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                session.toggleMark(at: point)
+                session.toggleMark(card: cardIndex, at: point)
             }
         }
     }

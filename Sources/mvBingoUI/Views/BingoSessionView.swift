@@ -21,7 +21,7 @@ public struct BingoSessionView: View {
         ZStack(alignment: .top) {
             theme.pageBackground.ignoresSafeArea()
 
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 header
 
                 HStack(alignment: .center, spacing: 16) {
@@ -34,8 +34,10 @@ public struct BingoSessionView: View {
                             .font(.subheadline)
                             .foregroundStyle(theme.bodyColor.opacity(0.9))
                             .monospacedDigit()
-                        if case .bingo(let pattern, _) = session.status {
-                            Text("BINGO — \(pattern.label)!")
+                        if let win = session.firstWin {
+                            Text(session.cardCount > 1
+                                 ? "BINGO — Card \(win.cardIndex + 1)!"
+                                 : "BINGO — \(win.pattern.label)!")
                                 .font(.callout.weight(.bold))
                                 .foregroundStyle(theme.lastBallRing)
                                 .padding(.top, 2)
@@ -45,9 +47,9 @@ public struct BingoSessionView: View {
                 }
                 .padding(.horizontal)
 
-                BingoCardView(session: session)
+                cardsLayout
                     .padding(.horizontal, 14)
-                    .frame(maxWidth: 540)
+                    .frame(maxWidth: 600)
                     .frame(maxWidth: .infinity)
 
                 CallHistoryView(drawn: session.drawn)
@@ -71,5 +73,32 @@ public struct BingoSessionView: View {
             Spacer()
         }
         .padding(.horizontal)
+    }
+
+    /// Lays out 1...4 cards adaptively. Single card is full-width; 2 and 3
+    /// stack vertically; 4 fits in a 2×2 grid.
+    @ViewBuilder
+    private var cardsLayout: some View {
+        switch session.cardCount {
+        case 1:
+            BingoCardView(session: session, cardIndex: 0)
+        case 4:
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    BingoCardView(session: session, cardIndex: 0)
+                    BingoCardView(session: session, cardIndex: 1)
+                }
+                HStack(spacing: 8) {
+                    BingoCardView(session: session, cardIndex: 2)
+                    BingoCardView(session: session, cardIndex: 3)
+                }
+            }
+        default:
+            VStack(spacing: 8) {
+                ForEach(0..<session.cardCount, id: \.self) { i in
+                    BingoCardView(session: session, cardIndex: i)
+                }
+            }
+        }
     }
 }
