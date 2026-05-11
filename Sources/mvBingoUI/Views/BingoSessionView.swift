@@ -28,7 +28,16 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.soundMuted)
     private var soundMuted: Bool = BingoSettingsDefault.soundMuted
 
+    @AppStorage(BingoSettingsKey.themeName)
+    private var themeNameRaw: String = BingoSettingsDefault.themeName
+
     @State private var soundPlayer = SoundEffectPlayer()
+
+    /// The theme to use everywhere in this view — the user's setting if
+    /// they've picked one, otherwise the value inherited from the host.
+    private var activeTheme: Theme {
+        BingoThemeName(rawValue: themeNameRaw)?.theme ?? theme
+    }
 
     private var ballInterval: BallInterval {
         BallInterval(rawValue: ballIntervalRaw) ?? .manual
@@ -61,7 +70,7 @@ public struct BingoSessionView: View {
 
     public var body: some View {
         ZStack(alignment: .top) {
-            theme.pageBackground.ignoresSafeArea()
+            activeTheme.pageBackground.ignoresSafeArea()
 
             VStack(spacing: 14) {
                 header
@@ -153,14 +162,16 @@ public struct BingoSessionView: View {
         }
         .sheet(isPresented: $isShowingSettings) {
             SettingsSheet()
-                .bingoTheme(theme)
+                .bingoTheme(activeTheme)
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $isShowingStats) {
             StatsSheet(store: statsStore)
-                .bingoTheme(theme)
+                .bingoTheme(activeTheme)
                 .presentationDetents([.medium, .large])
         }
+        // Propagate the selected theme to every child view via environment.
+        .bingoTheme(activeTheme)
     }
 
     private func recordCurrentGameIfNeeded() {
@@ -181,7 +192,7 @@ public struct BingoSessionView: View {
         HStack(spacing: 10) {
             Text("Bingo")
                 .font(.system(.largeTitle, design: .serif).weight(.bold))
-                .foregroundStyle(theme.headlineColor)
+                .foregroundStyle(activeTheme.headlineColor)
             Spacer()
             iconButton(systemImage: "chart.bar.fill", accessibilityLabel: "Stats") {
                 isShowingStats = true
@@ -201,13 +212,13 @@ public struct BingoSessionView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(theme.headlineColor)
+                .foregroundStyle(activeTheme.headlineColor)
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
                         .fill(.ultraThinMaterial)
                         .overlay(
-                            Circle().stroke(theme.bodyColor.opacity(0.22), lineWidth: 1)
+                            Circle().stroke(activeTheme.bodyColor.opacity(0.22), lineWidth: 1)
                         )
                 )
         }
@@ -218,17 +229,17 @@ public struct BingoSessionView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(session.pattern.label)
                 .font(.headline.weight(.bold))
-                .foregroundStyle(theme.headlineColor)
+                .foregroundStyle(activeTheme.headlineColor)
             Text("\(session.drawn.count) of 75 called")
                 .font(.subheadline)
-                .foregroundStyle(theme.bodyColor.opacity(0.9))
+                .foregroundStyle(activeTheme.bodyColor.opacity(0.9))
                 .monospacedDigit()
             if let win = session.firstWin {
                 Text(session.cardCount > 1
                      ? "BINGO — Card \(win.cardIndex + 1)!"
                      : "BINGO — \(win.pattern.label)!")
                     .font(.callout.weight(.bold))
-                    .foregroundStyle(theme.lastBallRing)
+                    .foregroundStyle(activeTheme.lastBallRing)
                     .padding(.top, 2)
             }
         }

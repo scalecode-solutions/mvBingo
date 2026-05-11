@@ -24,6 +24,9 @@ public struct SettingsSheet: View {
     @AppStorage(BingoSettingsKey.soundMuted)
     private var soundMuted: Bool = BingoSettingsDefault.soundMuted
 
+    @AppStorage(BingoSettingsKey.themeName)
+    private var themeNameRaw: String = BingoSettingsDefault.themeName
+
     public init() {}
 
     private var ballInterval: Binding<BallInterval> {
@@ -40,6 +43,7 @@ public struct SettingsSheet: View {
                 daubingSection
                 timerSection
                 soundSection
+                themeSection
             }
             .scrollContentBackground(.hidden)
             .background(theme.pageBackground.ignoresSafeArea())
@@ -111,6 +115,21 @@ public struct SettingsSheet: View {
             sectionHeader("Sound")
         } footer: {
             Text("Sound effects play on draws, daubs, and BINGO when unmuted.")
+                .foregroundStyle(theme.bodyColor.opacity(0.8))
+        }
+    }
+
+    private var themeSection: some View {
+        Section {
+            Picker("Theme", selection: $themeNameRaw) {
+                ForEach(BingoThemeName.allCases) { name in
+                    Text(name.label).tag(name.rawValue)
+                }
+            }
+        } header: {
+            sectionHeader("Theme")
+        } footer: {
+            Text("Picks the color palette used across the whole game.")
                 .foregroundStyle(theme.bodyColor.opacity(0.8))
         }
     }
