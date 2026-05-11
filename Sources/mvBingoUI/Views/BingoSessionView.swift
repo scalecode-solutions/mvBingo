@@ -190,12 +190,13 @@ public struct BingoSessionView: View {
         }
         .onChange(of: cardCount) { _, new in
             let clamped = Self.allowedCardCounts.contains(new) ? new : 1
-            // If we had to snap, write the corrected value back so the
-            // picker and session stay aligned.
             if clamped != new { cardCount = clamped }
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-                session.setCardCount(clamped)
-            }
+            // No withAnimation here — wrapping the resize in a spring
+            // transaction kept stale-cardIndex views mounted during
+            // interpolation, leading to "index out of range" subscripts
+            // on the way down (4 → 1). The discrete settings switch
+            // doesn't need an animation anyway.
+            session.setCardCount(clamped)
         }
         .onChange(of: patternRaw) { _, new in
             guard let pattern = WinPattern(rawValue: new) else { return }
