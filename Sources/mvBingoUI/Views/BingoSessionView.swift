@@ -19,6 +19,20 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.autoDaub)
     private var autoDaub: Bool = BingoSettingsDefault.autoDaub
 
+    @AppStorage(BingoSettingsKey.ballIntervalRawValue)
+    private var ballIntervalRaw: Int = BingoSettingsDefault.ballIntervalRawValue
+
+    private var ballInterval: BallInterval {
+        BallInterval(rawValue: ballIntervalRaw) ?? .manual
+    }
+
+    /// Combined id for the auto-advance task. Changing the interval OR
+    /// restarting the session (which updates `startedAt`) restarts the loop.
+    private struct AutoAdvanceID: Hashable {
+        let interval: Int
+        let sessionStart: Date
+    }
+
     public init(session: BingoSession? = nil) {
         // Read the persisted card count so the session boots with the
         // player's last setting; defaults to 1 on first launch.
@@ -77,6 +91,26 @@ public struct BingoSessionView: View {
             guard new else { return }
             withAnimation(.spring(response: 0.32, dampingFraction: 0.75)) {
                 session.autoMarkCalledNumbers()
+            }
+        }
+        // Auto-advance: when ballInterval is non-manual, draw a ball every N
+        // seconds. Re-keyed on session.startedAt so restarting the game also
+        // restarts the loop.
+        .task(id: AutoAdvanceID(interval: ballIntervalRaw, sessionStart: session.startedAt)) {
+            guard let seconds = ballInterval.seconds else { return }
+            while !Task.isCancelled,
+                  !session.hasBingo,
+                  !session.isExhausted {
+                do {
+                    try await Task.sleep(for: .seconds(seconds))
+                } catch {
+                    return
+                }
+                if Task.isCancelled { return }
+                guard !session.hasBingo, !session.isExhausted else { return }
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                    _ = session.drawNext()
+                }
             }
         }
         .sheet(isPresented: $isShowingSettings) {
