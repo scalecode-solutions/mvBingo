@@ -22,8 +22,17 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.ballIntervalRawValue)
     private var ballIntervalRaw: Int = BingoSettingsDefault.ballIntervalRawValue
 
+    @AppStorage(BingoSettingsKey.soundMuted)
+    private var soundMuted: Bool = BingoSettingsDefault.soundMuted
+
+    @State private var soundPlayer = SoundEffectPlayer()
+
     private var ballInterval: BallInterval {
         BallInterval(rawValue: ballIntervalRaw) ?? .manual
+    }
+
+    private var totalMarkCount: Int {
+        session.marks.reduce(0) { $0 + $1.count }
     }
 
     /// Combined id for the auto-advance task. Changing the interval OR
@@ -79,12 +88,26 @@ public struct BingoSessionView: View {
                 session.setCardCount(clamped)
             }
         }
-        // Auto-daub: sweep matches after every draw, and once when the
-        // toggle flips on mid-game so any already-called numbers catch up.
-        .onChange(of: session.drawn.count) { _, _ in
+        // Auto-daub + ball-drawn sound: both fire on each new draw.
+        .onChange(of: session.drawn.count) { old, new in
+            guard new > old else { return }
+            if !soundMuted { soundPlayer.play(.ballDrawn) }
             guard autoDaub else { return }
             withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                 session.autoMarkCalledNumbers()
+            }
+        }
+        // Daub sound on any new mark, regardless of source (user tap or
+        // auto-daub). Tracked via the total mark count across all cards.
+        .onChange(of: totalMarkCount) { old, new in
+            if new > old, !soundMuted {
+                soundPlayer.play(.daub)
+            }
+        }
+        // BINGO fanfare when the first card completes the pattern.
+        .onChange(of: session.firstWin?.cardIndex) { old, new in
+            if new != nil, old == nil, !soundMuted {
+                soundPlayer.play(.bingo)
             }
         }
         .onChange(of: autoDaub) { _, new in
