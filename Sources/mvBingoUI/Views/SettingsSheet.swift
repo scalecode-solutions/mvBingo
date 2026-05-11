@@ -89,15 +89,14 @@ public struct SettingsSheet: View {
     private var cardsSection: some View {
         Section {
             Picker("Cards", selection: $cardCount) {
-                ForEach(1...BingoSession.maxCards, id: \.self) { count in
-                    Text("\(count)").tag(count)
-                }
+                Text("1").tag(1)
+                Text("4").tag(4)
             }
             .pickerStyle(.segmented)
         } header: {
             sectionHeader("Cards")
         } footer: {
-            Text("Play 1 to \(BingoSession.maxCards) cards at once. More cards = more chances to bingo on each draw.")
+            Text("Play one card or a 2×2 grid of four. More cards = more chances to bingo on each draw.")
                 .foregroundStyle(theme.bodyColor.opacity(0.8))
         }
     }
