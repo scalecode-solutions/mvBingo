@@ -34,6 +34,9 @@ public struct BingoSessionView: View {
     @AppStorage(BingoSettingsKey.voiceEnabled)
     private var voiceEnabled: Bool = BingoSettingsDefault.voiceEnabled
 
+    @AppStorage(BingoSettingsKey.patternRawValue)
+    private var patternRaw: String = BingoSettingsDefault.patternRawValue
+
     @State private var soundPlayer = SoundEffectPlayer()
     @State private var caller = BingoCaller()
     /// Wall-clock time of the next auto-draw. Updated by the auto-advance
@@ -78,12 +81,18 @@ public struct BingoSessionView: View {
         session: BingoSession? = nil,
         statsStore: any StatsStore = UserDefaultsStatsStore()
     ) {
-        // Read the persisted card count so the session boots with the
-        // player's last setting; defaults to 1 on first launch.
-        let stored = UserDefaults.standard.object(forKey: BingoSettingsKey.cardCount) as? Int
-        let count = stored ?? BingoSettingsDefault.cardCount
+        // Read persisted settings so the session boots with the player's
+        // last cardCount + pattern; defaults on first launch.
+        let storedCount = UserDefaults.standard.object(forKey: BingoSettingsKey.cardCount) as? Int
+        let count = storedCount ?? BingoSettingsDefault.cardCount
         let clamped = max(1, min(BingoSession.maxCards, count))
-        let initial = session ?? BingoSession.random(cardCount: clamped)
+
+        let storedPattern = UserDefaults.standard.string(forKey: BingoSettingsKey.patternRawValue)
+        let pattern = storedPattern.flatMap(WinPattern.init(rawValue:))
+            ?? WinPattern(rawValue: BingoSettingsDefault.patternRawValue)
+            ?? .anyLine
+
+        let initial = session ?? BingoSession.random(cardCount: clamped, pattern: pattern)
         _session = State(initialValue: initial)
         self.statsStore = statsStore
     }
@@ -128,6 +137,12 @@ public struct BingoSessionView: View {
             let clamped = max(1, min(BingoSession.maxCards, new))
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                 session.setCardCount(clamped)
+            }
+        }
+        .onChange(of: patternRaw) { _, new in
+            guard let pattern = WinPattern(rawValue: new) else { return }
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                session.setPattern(pattern)
             }
         }
         // Each new draw: voice announces, sound bonks, auto-daub catches up.

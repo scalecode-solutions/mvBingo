@@ -19,7 +19,7 @@ for iPhone.)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.3.0"),
+    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.3.5"),
 ],
 targets: [
     .target(
@@ -53,7 +53,8 @@ player dab matches, and detects the winning pattern.
 ## Features
 
 - **75-ball standard format** — B 1-15, I 16-30, N 31-45, G 46-60, O 61-75
-- **5 winning patterns** — Any Line, Four Corners, X, Plus, Blackout
+- **5 winning patterns** — Any Line, Four Corners, X, Plus, Blackout —
+  switchable in Settings
 - **1 to 4 cards on screen** — solo or simulate a multi-card bingo hall
 - **Free center space** — pre-marked and can't be toggled off
 - **Manual or auto-daub** — tap to mark, or let the app catch matches
