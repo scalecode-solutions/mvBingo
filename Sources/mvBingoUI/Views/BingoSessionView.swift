@@ -99,6 +99,11 @@ public struct BingoSessionView: View {
         let paused: Bool
     }
 
+    /// Card counts the UI offers. The engine supports 1...4 generally;
+    /// the picker just exposes 1 and 4 because 2- and 3-card stacked
+    /// layouts render each card too small to be readable on iPhone.
+    private static let allowedCardCounts: Set<Int> = [1, 4]
+
     public init(
         session: BingoSession? = nil,
         statsStore: any StatsStore = UserDefaultsStatsStore(),
@@ -108,9 +113,12 @@ public struct BingoSessionView: View {
     ) {
         // Read persisted settings so the session boots with the player's
         // last cardCount + pattern; defaults on first launch.
+        // Card count is currently restricted to {1, 4} in the UI — stale
+        // 2/3 values (from earlier versions or external setCardCount calls)
+        // snap to 1.
         let storedCount = UserDefaults.standard.object(forKey: BingoSettingsKey.cardCount) as? Int
         let count = storedCount ?? BingoSettingsDefault.cardCount
-        let clamped = max(1, min(BingoSession.maxCards, count))
+        let clamped = Self.allowedCardCounts.contains(count) ? count : 1
 
         let storedPattern = UserDefaults.standard.string(forKey: BingoSettingsKey.patternRawValue)
         let pattern = storedPattern.flatMap(WinPattern.init(rawValue:))
@@ -181,7 +189,10 @@ public struct BingoSessionView: View {
             .padding(.top, 8)
         }
         .onChange(of: cardCount) { _, new in
-            let clamped = max(1, min(BingoSession.maxCards, new))
+            let clamped = Self.allowedCardCounts.contains(new) ? new : 1
+            // If we had to snap, write the corrected value back so the
+            // picker and session stay aligned.
+            if clamped != new { cardCount = clamped }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                 session.setCardCount(clamped)
             }
