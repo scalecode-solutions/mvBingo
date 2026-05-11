@@ -91,7 +91,7 @@ public final class BingoSession {
     // MARK: - Marks
 
     public func toggleMark(card cardIndex: Int, at point: GridPoint) {
-        guard cards.indices.contains(cardIndex) else { return }
+        guard marks.indices.contains(cardIndex) else { return }
         if point == BingoCard.freeSpace { return }
         if marks[cardIndex].contains(point) {
             marks[cardIndex].remove(point)
@@ -101,12 +101,12 @@ public final class BingoSession {
     }
 
     public func mark(card cardIndex: Int, at point: GridPoint) {
-        guard cards.indices.contains(cardIndex) else { return }
+        guard marks.indices.contains(cardIndex) else { return }
         marks[cardIndex].insert(point)
     }
 
     public func unmark(card cardIndex: Int, at point: GridPoint) {
-        guard cards.indices.contains(cardIndex) else { return }
+        guard marks.indices.contains(cardIndex) else { return }
         guard point != BingoCard.freeSpace else { return }
         marks[cardIndex].remove(point)
     }
@@ -133,7 +133,11 @@ public final class BingoSession {
 
     /// Numbers on the given card that have been called but not yet daubed.
     public func unmarkedCalledPoints(card cardIndex: Int) -> [GridPoint] {
-        guard cards.indices.contains(cardIndex) else { return [] }
+        // Both arrays are checked because cards and marks can be transiently
+        // out of sync during a setCardCount mutation; any accessor that
+        // touches both has to verify both bounds.
+        guard cards.indices.contains(cardIndex),
+              marks.indices.contains(cardIndex) else { return [] }
         let called = Set(drawn.map(\.number))
         let card = cards[cardIndex]
         let cardMarks = marks[cardIndex]
@@ -150,9 +154,9 @@ public final class BingoSession {
         return drawn.contains(where: { $0.number == n })
     }
 
-    /// Marks for the given card. Empty array fallback for invalid indices.
+    /// Marks for the given card. Empty fallback for invalid indices.
     public func marks(card cardIndex: Int) -> Set<GridPoint> {
-        guard cards.indices.contains(cardIndex) else { return [] }
+        guard marks.indices.contains(cardIndex) else { return [] }
         return marks[cardIndex]
     }
 
@@ -217,19 +221,27 @@ public final class BingoSession {
     /// Resize the card stack mid-game. Adding cards: new ones are random,
     /// free-space-only marks, and they see the existing draw history.
     /// Removing cards: trims from the end.
+    ///
+    /// New arrays are built in local copies and assigned at the end so the
+    /// `cards.count == marks.count` invariant holds for every observer.
     public func setCardCount(_ count: Int) {
         let target = max(1, min(Self.maxCards, count))
         if target == cards.count { return }
-        if target < cards.count {
-            cards = Array(cards.prefix(target))
-            marks = Array(marks.prefix(target))
+
+        var nextCards = cards
+        var nextMarks = marks
+        if target < nextCards.count {
+            nextCards = Array(nextCards.prefix(target))
+            nextMarks = Array(nextMarks.prefix(target))
         } else {
-            let toAdd = target - cards.count
+            let toAdd = target - nextCards.count
             for _ in 0..<toAdd {
-                cards.append(BingoCard.random())
-                marks.append([BingoCard.freeSpace])
+                nextCards.append(BingoCard.random())
+                nextMarks.append([BingoCard.freeSpace])
             }
         }
+        cards = nextCards
+        marks = nextMarks
     }
 
     public func setPattern(_ pattern: WinPattern) {
