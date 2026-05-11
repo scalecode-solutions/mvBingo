@@ -27,6 +27,9 @@ public struct SettingsSheet: View {
     @AppStorage(BingoSettingsKey.themeName)
     private var themeNameRaw: String = BingoSettingsDefault.themeName
 
+    @AppStorage(BingoSettingsKey.voiceEnabled)
+    private var voiceEnabled: Bool = BingoSettingsDefault.voiceEnabled
+
     public init() {}
 
     private var ballInterval: Binding<BallInterval> {
@@ -43,6 +46,7 @@ public struct SettingsSheet: View {
                 daubingSection
                 timerSection
                 soundSection
+                voiceSection
                 themeSection
             }
             .scrollContentBackground(.hidden)
@@ -115,6 +119,18 @@ public struct SettingsSheet: View {
             sectionHeader("Sound")
         } footer: {
             Text("Sound effects play on draws, daubs, and BINGO when unmuted.")
+                .foregroundStyle(theme.bodyColor.opacity(0.8))
+        }
+    }
+
+    private var voiceSection: some View {
+        Section {
+            Toggle("Voice Caller", isOn: $voiceEnabled)
+                .tint(theme.lastBallRing)
+        } header: {
+            sectionHeader("Voice")
+        } footer: {
+            Text("Announce each ball aloud — 'B twelve' — using the device's text-to-speech.")
                 .foregroundStyle(theme.bodyColor.opacity(0.8))
         }
     }
