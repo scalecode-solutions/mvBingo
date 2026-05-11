@@ -11,6 +11,9 @@ public struct BingoSessionView: View {
 
     @State private var session: BingoSession
     @State private var isShowingSettings = false
+    @State private var isShowingStats = false
+    @State private var didRecordCurrentGame = false
+    private let statsStore: any StatsStore
     @Environment(\.bingoTheme) private var theme
 
     @AppStorage(BingoSettingsKey.cardCount)
@@ -42,7 +45,10 @@ public struct BingoSessionView: View {
         let sessionStart: Date
     }
 
-    public init(session: BingoSession? = nil) {
+    public init(
+        session: BingoSession? = nil,
+        statsStore: any StatsStore = UserDefaultsStatsStore()
+    ) {
         // Read the persisted card count so the session boots with the
         // player's last setting; defaults to 1 on first launch.
         let stored = UserDefaults.standard.object(forKey: BingoSettingsKey.cardCount) as? Int
@@ -50,6 +56,7 @@ public struct BingoSessionView: View {
         let clamped = max(1, min(BingoSession.maxCards, count))
         let initial = session ?? BingoSession.random(cardCount: clamped)
         _session = State(initialValue: initial)
+        self.statsStore = statsStore
     }
 
     public var body: some View {
@@ -104,11 +111,19 @@ public struct BingoSessionView: View {
                 soundPlayer.play(.daub)
             }
         }
-        // BINGO fanfare when the first card completes the pattern.
+        // BINGO fanfare + stats record when the first card completes the
+        // pattern. Guarded by didRecordCurrentGame so we record once per
+        // round even if firstWin briefly toggles via undo-equivalents.
         .onChange(of: session.firstWin?.cardIndex) { old, new in
-            if new != nil, old == nil, !soundMuted {
-                soundPlayer.play(.bingo)
+            if new != nil, old == nil {
+                if !soundMuted { soundPlayer.play(.bingo) }
+                recordCurrentGameIfNeeded()
             }
+        }
+        // Reset the per-round record flag when startedAt changes (a fresh
+        // session — restart or new cards).
+        .onChange(of: session.startedAt) { _, _ in
+            didRecordCurrentGame = false
         }
         .onChange(of: autoDaub) { _, new in
             guard new else { return }
@@ -141,6 +156,25 @@ public struct BingoSessionView: View {
                 .bingoTheme(theme)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $isShowingStats) {
+            StatsSheet(store: statsStore)
+                .bingoTheme(theme)
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func recordCurrentGameIfNeeded() {
+        guard !didRecordCurrentGame, let win = session.firstWin else { return }
+        didRecordCurrentGame = true
+        let game = CompletedBingoGame(
+            pattern: session.pattern,
+            cardCount: session.cardCount,
+            ballsCalled: session.drawn.count,
+            winningCardIndex: win.cardIndex,
+            duration: Date().timeIntervalSince(session.startedAt)
+        )
+        let store = statsStore
+        Task { await store.record(game) }
     }
 
     private var header: some View {
@@ -149,24 +183,35 @@ public struct BingoSessionView: View {
                 .font(.system(.largeTitle, design: .serif).weight(.bold))
                 .foregroundStyle(theme.headlineColor)
             Spacer()
-            Button {
-                isShowingSettings = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(theme.headlineColor)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Circle().stroke(theme.bodyColor.opacity(0.22), lineWidth: 1)
-                            )
-                    )
+            iconButton(systemImage: "chart.bar.fill", accessibilityLabel: "Stats") {
+                isShowingStats = true
             }
-            .accessibilityLabel("Settings")
+            iconButton(systemImage: "gearshape.fill", accessibilityLabel: "Settings") {
+                isShowingSettings = true
+            }
         }
         .padding(.horizontal)
+    }
+
+    private func iconButton(
+        systemImage: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(theme.headlineColor)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Circle().stroke(theme.bodyColor.opacity(0.22), lineWidth: 1)
+                        )
+                )
+        }
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private var statusBlock: some View {
