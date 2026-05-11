@@ -40,7 +40,7 @@ public struct ControlBar: View {
                 isEnabled: true
             ) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-                    session.newCard()
+                    session.newCards()
                 }
             }
         }
