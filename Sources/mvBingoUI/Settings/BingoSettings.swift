@@ -8,6 +8,7 @@ public enum BingoSettingsKey {
     public static let autoDaub = "dev.scalecode.mvBingo.autoDaub"
     public static let ballIntervalRawValue = "dev.scalecode.mvBingo.ballIntervalRawValue"
     public static let soundMuted = "dev.scalecode.mvBingo.soundMuted"
+    public static let themeName = "dev.scalecode.mvBingo.themeName"
 }
 
 /// Default values, kept alongside the keys so the settings layer is the
@@ -19,6 +20,7 @@ public enum BingoSettingsDefault {
     public static let ballIntervalRawValue = BallInterval.manual.rawValue
     /// Sound starts muted per design.
     public static let soundMuted = true
+    public static let themeName = BingoThemeName.churchBasement.rawValue
 }
 
 /// How often the next ball is drawn automatically. `manual` means no
