@@ -19,7 +19,7 @@ for iPhone.)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.4.3"),
+    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.4.4"),
 ],
 targets: [
     .target(

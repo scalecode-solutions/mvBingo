@@ -46,7 +46,13 @@ public struct BingoCardView: View {
         }
     }
 
-    private var card: BingoCard { session.cards[cardIndex] }
+    /// Optional so the cell body can render no-op during the brief window
+    /// where `withAnimation` keeps a stale-cardIndex Grid mounted while the
+    /// surrounding `cardsLayout` switch is transitioning between cases.
+    private var card: BingoCard? {
+        guard session.cards.indices.contains(cardIndex) else { return nil }
+        return session.cards[cardIndex]
+    }
 
     private func headerLetter(_ letter: String) -> some View {
         Text(letter)
@@ -78,7 +84,7 @@ public struct BingoCardView: View {
                 Text("FREE")
                     .font(.system(.caption2, design: .rounded).weight(.heavy))
                     .foregroundStyle(theme.cellText.opacity(0.5))
-            } else if let n = card.number(at: point) {
+            } else if let n = card?.number(at: point) {
                 Text("\(n)")
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(theme.cellText)
