@@ -3,17 +3,39 @@ import mvBingoKit
 
 /// Top-level bingo scene. Drop into a SwiftUI hierarchy and you're playing.
 ///
+/// ### Standalone
 /// ```swift
 /// BingoSessionView()
 ///     .bingoTheme(.churchBasement)
 /// ```
+///
+/// ### Embedded in a host
+/// Pass `embedded: true` to hide the internal title row, and provide
+/// `isShowingStats` / `isShowingSettings` bindings so the host's own
+/// toolbar buttons can open the same sheets.
+///
+/// ```swift
+/// @State private var showsStats = false
+/// @State private var showsSettings = false
+///
+/// BingoSessionView(
+///     embedded: true,
+///     isShowingStats: $showsStats,
+///     isShowingSettings: $showsSettings
+/// )
+/// .navigationTitle("Bingo")
+/// .toolbar { … }
+/// ```
 public struct BingoSessionView: View {
 
     @State private var session: BingoSession
-    @State private var isShowingSettings = false
-    @State private var isShowingStats = false
+    @State private var internalIsShowingSettings = false
+    @State private var internalIsShowingStats = false
     @State private var didRecordCurrentGame = false
     private let statsStore: any StatsStore
+    private let embedded: Bool
+    private let externalStatsBinding: Binding<Bool>?
+    private let externalSettingsBinding: Binding<Bool>?
     @Environment(\.bingoTheme) private var theme
 
     @AppStorage(BingoSettingsKey.cardCount)
@@ -79,7 +101,10 @@ public struct BingoSessionView: View {
 
     public init(
         session: BingoSession? = nil,
-        statsStore: any StatsStore = UserDefaultsStatsStore()
+        statsStore: any StatsStore = UserDefaultsStatsStore(),
+        embedded: Bool = false,
+        isShowingStats: Binding<Bool>? = nil,
+        isShowingSettings: Binding<Bool>? = nil
     ) {
         // Read persisted settings so the session boots with the player's
         // last cardCount + pattern; defaults on first launch.
@@ -95,6 +120,26 @@ public struct BingoSessionView: View {
         let initial = session ?? BingoSession.random(cardCount: clamped, pattern: pattern)
         _session = State(initialValue: initial)
         self.statsStore = statsStore
+        self.embedded = embedded
+        self.externalStatsBinding = isShowingStats
+        self.externalSettingsBinding = isShowingSettings
+    }
+
+    /// Drives the stats sheet's `isPresented:`. External binding wins when
+    /// supplied; otherwise the view manages its own state.
+    private var statsBinding: Binding<Bool> {
+        externalStatsBinding ?? Binding(
+            get: { internalIsShowingStats },
+            set: { internalIsShowingStats = $0 }
+        )
+    }
+
+    /// Same idea for the settings sheet.
+    private var settingsBinding: Binding<Bool> {
+        externalSettingsBinding ?? Binding(
+            get: { internalIsShowingSettings },
+            set: { internalIsShowingSettings = $0 }
+        )
     }
 
     public var body: some View {
@@ -102,7 +147,9 @@ public struct BingoSessionView: View {
             activeTheme.pageBackground.ignoresSafeArea()
 
             VStack(spacing: 14) {
-                header
+                if !embedded {
+                    header
+                }
 
                 HStack(alignment: .center, spacing: 16) {
                     LastBallView(ball: session.lastDrawn)
@@ -241,12 +288,12 @@ public struct BingoSessionView: View {
             }
             nextDrawAt = nil
         }
-        .sheet(isPresented: $isShowingSettings) {
+        .sheet(isPresented: settingsBinding) {
             SettingsSheet()
                 .bingoTheme(activeTheme)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $isShowingStats) {
+        .sheet(isPresented: statsBinding) {
             StatsSheet(store: statsStore)
                 .bingoTheme(activeTheme)
                 .presentationDetents([.medium, .large])
@@ -276,10 +323,10 @@ public struct BingoSessionView: View {
                 .foregroundStyle(activeTheme.headlineColor)
             Spacer()
             iconButton(systemImage: "chart.bar.fill", accessibilityLabel: "Stats") {
-                isShowingStats = true
+                statsBinding.wrappedValue = true
             }
             iconButton(systemImage: "gearshape.fill", accessibilityLabel: "Settings") {
-                isShowingSettings = true
+                settingsBinding.wrappedValue = true
             }
         }
         .padding(.horizontal)
