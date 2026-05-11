@@ -19,7 +19,7 @@ for iPhone.)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.2.0"),
+    .package(url: "https://github.com/scalecode-solutions/mvBingo.git", from: "0.3.0"),
 ],
 targets: [
     .target(
@@ -58,7 +58,9 @@ player dab matches, and detects the winning pattern.
 - **Free center space** — pre-marked and can't be toggled off
 - **Manual or auto-daub** — tap to mark, or let the app catch matches
 - **Manual or auto-advance** — tap Next Ball, or pick a 5/10/15/20 second
-  draw timer
+  draw timer with a live countdown card you can tap to pause / resume
+- **Background-aware** — backgrounding auto-pauses the timer and silences
+  any mid-sentence voice announcement; foregrounding resumes
 - **Voice caller (optional)** — `AVSpeechSynthesizer` announces each ball:
   "B... twelve"
 - **Procedural sound effects (optional)** — ball-pop, daub-tap, BINGO
